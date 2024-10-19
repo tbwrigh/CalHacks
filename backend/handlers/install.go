@@ -132,3 +132,32 @@ func GetScanResultsHandler(c *gin.Context) {
 		"languages": languages,
 	})
 }
+
+func GetInstallHandler(c *gin.Context) {
+	var req ScanRequest
+
+	// Bind the JSON body to the struct
+	if err := c.BindJSON(&req); err != nil {
+		// If there is an error, return a 400 Bad Request response
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid input",
+		})
+		return
+	}
+
+	token := c.GetHeader("Authorization")
+
+	if token == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header missing"})
+		return
+	}
+
+	// Remove the "Bearer " prefix from the token
+	token = token[len("Bearer "):]
+
+	lib.MakeAction(req.Owner, req.Repo, token)
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": "Installation started",
+	})
+}

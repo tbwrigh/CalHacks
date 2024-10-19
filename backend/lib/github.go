@@ -6,6 +6,9 @@ import (
 	"calhacks/api/models"
 	"io"
 	"io/ioutil"
+	"os"
+	"path/filepath"
+	"runtime"
 
 	"encoding/base64"
 	"encoding/json"
@@ -299,6 +302,7 @@ func GetBranchSHA(owner, repo, branch, token string) (string, error) {
 
 // Function to create a new branch based on the SHA of an existing branch
 func CreateBranch(owner, repo, newBranch, sha, token string) error {
+	fmt.Println("Creating branch...")
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/git/refs", owner, repo)
 
 	newRef := BranchRef{
@@ -306,38 +310,63 @@ func CreateBranch(owner, repo, newBranch, sha, token string) error {
 		SHA: sha,
 	}
 
+	fmt.Println("Created new ref")
+	fmt.Println(newRef)
+
 	body, err := json.Marshal(newRef)
 	if err != nil {
 		return err
 	}
 
+	fmt.Println("Marshalled body")
+
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
 		return err
 	}
+
+	fmt.Println("Created request")
+
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("User-Agent", "AutoLockAI")
+
+	fmt.Println("Set headers")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
+
+	fmt.Println("Sent request")
+
 	defer resp.Body.Close()
+
+	fmt.Println("Closed response body")
 
 	if resp.StatusCode != 201 {
 		return fmt.Errorf("failed to create branch: %s", resp.Status)
 	}
 
+	fmt.Println("Created branch")
+
 	return nil
 }
 
 func GeneratePRBranch(owner, repo, token string) (string, error) {
+	fmt.Println("Generating PR branch...")
+
 	// get repo info
 	repoData, err := GetRepo(owner, repo, token)
 	if err != nil {
 		return "", err
 	}
+
+	fmt.Println("Got repo info")
+
+	fmt.Println("Getting latest commit SHA...")
 
 	// Get the latest commit SHA of the main branch
 	sha, err := GetBranchSHA(owner, repo, repoData.DefaultBranch, token)
@@ -345,11 +374,17 @@ func GeneratePRBranch(owner, repo, token string) (string, error) {
 		return "", err
 	}
 
+	fmt.Println("Got latest commit SHA")
+
+	fmt.Println("Creating new branch...")
+
 	// Create a new branch based on the main branch
 	newBranch := "autolock-" + uuid.New().String()
 	if err := CreateBranch(owner, repo, newBranch, sha, token); err != nil {
 		return "", err
 	}
+
+	fmt.Println("Created new branch")
 
 	return newBranch, nil
 }
@@ -499,10 +534,15 @@ func PRBranch(owner string, repo string, branch string, token string) error {
 
 func CreatePR(owner string, repo string, changes []FileChange, token string) error {
 	// step 1 make a new branch
+	fmt.Println("Creating PR branch...")
 	newBranch, err := GeneratePRBranch(owner, repo, token)
 	if err != nil {
 		return err
 	}
+
+	fmt.Println("Created PR branch")
+
+	fmt.Println("Creating commits...")
 
 	// step 2 create a new commit
 	for _, change := range changes {
@@ -512,11 +552,77 @@ func CreatePR(owner string, repo string, changes []FileChange, token string) err
 		}
 	}
 
+	fmt.Println("Created commits")
+
+	fmt.Println("Creating PR...")
+
 	// step 3 create a new PR
 	err = PRBranch(owner, repo, newBranch, token)
 	if err != nil {
 		return err
 	}
+
+	fmt.Println("Created PR")
+
+	return nil
+}
+
+func MakeAction(owner, repo, token string) error {
+	// create PR in go routine
+	go func() {
+		fmt.Println("Creating PR...")
+
+		_, filePath, _, _ := runtime.Caller(0) // Get the current file's directory
+		dir := filepath.Dir(filePath)
+
+		fmt.Println("Set dir")
+
+		// Read the file contents
+		content, err := os.ReadFile(filepath.Join(dir, "resources/autolock.yml"))
+		if err != nil {
+			return
+		}
+
+		fmt.Println("Read file")
+
+		// replace "%LANGUAGES%" in content with the supported languages
+		var languages []models.Language
+		result := db.DB.Joins("JOIN repo_languages ON languages.id = repo_languages.language_id").
+			Joins("JOIN repos ON repos.id = repo_languages.repository_id").
+			Where("repos.owner = ? AND repos.name = ? AND languages.supported = ?", owner, repo, true).
+			Find(&languages)
+
+		if result.Error != nil {
+			return
+		}
+
+		fmt.Println("Got languages")
+
+		// replace the placeholder with the supported languages
+		langs := make([]string, len(languages))
+		for i, lang := range languages {
+			langs[i] = "'" + strings.ToLower(lang.Name) + "'"
+		}
+
+		fmt.Println("Got langs")
+
+		content = []byte(strings.ReplaceAll(string(content), "%LANGUAGES%", strings.Join(langs, ",")))
+
+		fmt.Println("Replaced content")
+
+		fileChange := FileChange{
+			Path:    ".github/workflows/autolock.yml",
+			Content: string(content),
+			Message: "Add autolock workflow",
+			NewFile: true,
+		}
+
+		fmt.Println("Created file change")
+
+		CreatePR(owner, repo, []FileChange{fileChange}, token)
+
+		fmt.Println("Created PR")
+	}()
 
 	return nil
 }

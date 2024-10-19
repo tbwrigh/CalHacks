@@ -1,6 +1,36 @@
 <script>
     export let data;
 
+    const baseUrl = import.meta.env.VITE_API_URL;
+
+    let installPressed = false;
+
+    const handleInstall = () => {
+        installPressed = true;
+
+        // get auth token from cookies (at)
+        const cookie = document.cookie.split('; ').find(row => row.startsWith('at='));
+        const token = cookie ? cookie.split('=')[1] : "";
+
+      // post to the server to install the repository
+      fetch(`${baseUrl}/install`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          owner: data.owner,
+          repo: data.name,
+        }),
+      })
+        .then((res) => res.json())
+        .catch((err) => {
+          console.error(err);
+        });
+
+    };
+
     console.log(data);
     function logout() {
         window.location.href = '/api/auth/logout';
@@ -36,7 +66,7 @@
       {:else if data.scanComplete}
         <!-- Display scan result -->
         <div class="text-center">
-          <h1 class="text-3xl font-bold text-green-600 mb-4">Success: Scan Complete</h1>
+          <h1 class="text-3xl font-bold text-green-600 mb-4">Scan Complete - Ready To Install</h1>
 
           <!-- Display repository name -->
           <h2 class="text-2xl font-semibold text-gray-800 mb-6">Repository: {data.name}</h2>
@@ -59,7 +89,8 @@
 
           <!-- Install button (does nothing for now) -->
           <button
-            class="mt-6 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300">
+            class="mt-6 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300"
+            on:click={handleInstall}>
             Install
           </button>
         </div>
