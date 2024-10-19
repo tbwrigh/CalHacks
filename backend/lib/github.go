@@ -577,9 +577,16 @@ func MakeAction(owner, repo, token string) error {
 
 		fmt.Println("Set dir")
 
+		path := filepath.Join(dir, "resources/autolock.yml")
+
+		fmt.Println("Set path")
+		fmt.Println(path)
+
 		// Read the file contents
-		content, err := os.ReadFile(filepath.Join(dir, "resources/autolock.yml"))
+		content, err := os.ReadFile(path)
 		if err != nil {
+			fmt.Println("Error reading file")
+			fmt.Println(err)
 			return
 		}
 
