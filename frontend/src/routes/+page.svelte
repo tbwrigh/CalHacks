@@ -1,4 +1,5 @@
 <script>
+    export let data;
     const clientId = import.meta.env.VITE_GITHUB_CLIENT_ID;
     const redirectUri = 'http://localhost:5173/api/auth/callback'; // Replace with your real callback URL
     const githubLoginUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read:user%20user:email`;
@@ -15,11 +16,18 @@
         
         <!-- Login Button -->
         <div>
+        {#if data.logged_in}
+            <!-- Redirect to dashboard if logged in -->
+            <a href="/user" class="text-white bg-green-600 hover:bg-green-700 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-4 py-2 text-center">
+              Dashboard
+            </a>
+        {:else}  
           <button 
             class="text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2 text-center mr-3 md:mr-0"
             on:click={() => window.location.href = githubLoginUrl}>
             Login
           </button>
+        {/if}
         </div>
       </div>
     </nav>
