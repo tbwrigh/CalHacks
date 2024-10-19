@@ -17,6 +17,8 @@ func main() {
 	router.GET("/me", handlers.MeHandler)
 	router.GET("/pr", handlers.PrHandler)
 	router.GET("/repo", handlers.RepoHandler)
+	router.POST("/scan/start", handlers.StartScanHandler)
+	router.POST("/scan/status", handlers.GetScanStatusHandler)
 
 	router.Run(":8080")
 }

@@ -41,7 +41,7 @@ func Init() {
 	}
 
 	// Auto-migrate the user model
-	err = DB.AutoMigrate(&models.User{})
+	err = DB.AutoMigrate(&models.User{}, &models.Language{}, &models.Repo{}, &models.RepoLanguage{})
 	if err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
