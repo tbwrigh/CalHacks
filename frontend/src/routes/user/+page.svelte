@@ -40,7 +40,9 @@
 
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {#each data.repos as repo}
-          <div class="bg-white shadow-md rounded-lg p-6">
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <!-- svelte-ignore a11y-no-static-element-interactions -->
+          <div class="bg-white shadow-md rounded-lg p-6" on:click={() => window.location.href = `/repo/${repo.full_name}`}>
             <h2 class="text-xl font-bold text-gray-900">{repo.name}</h2>
             <p class="text-sm text-gray-500">{repo.full_name}</p>
             <p class="text-sm text-gray-700 mt-2">{repo.description ? repo.description : 'No description provided.'}</p>

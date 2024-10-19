@@ -1,15 +1,20 @@
 package lib
 
 import (
+	"bytes"
 	"calhacks/api/db"
 	"calhacks/api/models"
+	"io"
+	"io/ioutil"
 
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 	"sync"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -21,11 +26,12 @@ type GitHubUser struct {
 }
 
 type GitHubRepo struct {
-	Name        string `json:"name"`
-	FullName    string `json:"full_name"`
-	Description string `json:"description"`
-	Language    string `json:"language"`
-	Owner       struct {
+	Name          string `json:"name"`
+	FullName      string `json:"full_name"`
+	Description   string `json:"description"`
+	Language      string `json:"language"`
+	DefaultBranch string `json:"default_branch"`
+	Owner         struct {
 		Login string `json:"login"`
 	} `json:"owner"`
 }
@@ -100,6 +106,39 @@ func GetUserRepos(token string) ([]GitHubRepo, error) {
 	}
 
 	return repos, nil
+}
+
+func GetRepo(owner, repo, token string) (*GitHubRepo, error) {
+	client := &http.Client{}
+
+	// Create the GitHub API request
+	req, err := http.NewRequest("GET", fmt.Sprintf("https://api.github.com/repos/%s/%s", owner, repo), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add the Authorization header with the Bearer token
+	req.Header.Add("Authorization", "Bearer "+token)
+
+	// Perform the request
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// Check for a successful response
+	if resp.StatusCode != http.StatusOK {
+		return nil, err
+	}
+
+	// Parse the response body
+	var repoData GitHubRepo
+	if err := json.NewDecoder(resp.Body).Decode(&repoData); err != nil {
+		return nil, err
+	}
+
+	return &repoData, nil
 }
 
 func FetchRepoFiles(owner, repo, token, path string) ([]File, error) {
@@ -219,4 +258,265 @@ func ProcessRepoFiles(owner, repo, token string) {
 
 		fmt.Printf("Scan complete for repository: %s/%s\n", owner, repo)
 	}()
+}
+
+type BranchRef struct {
+	Ref string `json:"ref"`
+	SHA string `json:"sha"`
+}
+
+// Function to get the latest commit SHA of a branch
+func GetBranchSHA(owner, repo, branch, token string) (string, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/git/refs/heads/%s", owner, repo, branch)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("failed to fetch branch sha: %s", resp.Status)
+	}
+
+	var result map[string]interface{}
+	body, _ := io.ReadAll(resp.Body)
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		return "", err
+	}
+
+	sha := result["object"].(map[string]interface{})["sha"].(string)
+	return sha, nil
+}
+
+// Function to create a new branch based on the SHA of an existing branch
+func CreateBranch(owner, repo, newBranch, sha, token string) error {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/git/refs", owner, repo)
+
+	newRef := BranchRef{
+		Ref: "refs/heads/" + newBranch,
+		SHA: sha,
+	}
+
+	body, err := json.Marshal(newRef)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 201 {
+		return fmt.Errorf("failed to create branch: %s", resp.Status)
+	}
+
+	return nil
+}
+
+func GeneratePRBranch(owner, repo, token string) (string, error) {
+	// get repo info
+	repoData, err := GetRepo(owner, repo, token)
+	if err != nil {
+		return "", err
+	}
+
+	// Get the latest commit SHA of the main branch
+	sha, err := GetBranchSHA(owner, repo, repoData.DefaultBranch, token)
+	if err != nil {
+		return "", err
+	}
+
+	// Create a new branch based on the main branch
+	newBranch := "autolock-" + uuid.New().String()
+	if err := CreateBranch(owner, repo, newBranch, sha, token); err != nil {
+		return "", err
+	}
+
+	return newBranch, nil
+}
+
+func getFileSHA(url, accessToken string) (string, error) {
+	// Set up the HTTP GET request to fetch the file
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create GET request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to send GET request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// If the file exists, return its SHA
+	if resp.StatusCode == http.StatusOK {
+		body, _ := ioutil.ReadAll(resp.Body)
+		var fileData map[string]interface{}
+		if err := json.Unmarshal(body, &fileData); err != nil {
+			return "", fmt.Errorf("failed to parse GET response: %v", err)
+		}
+		if sha, exists := fileData["sha"].(string); exists {
+			return sha, nil
+		}
+	}
+
+	// If the file does not exist, return an empty SHA for new files
+	return "", nil
+}
+
+type FileChange struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+	Message string `json:"message"`
+	NewFile bool   `json:"new_file"`
+}
+
+type FileContentRequest struct {
+	Message string `json:"message"`
+	Content string `json:"content"`
+	Branch  string `json:"branch"`
+	Sha     string `json:"sha,omitempty"` // Optional SHA for updating
+}
+
+func CreateCommit(owner string, repo string, branch string, change FileChange, token string) error {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/contents/%s", owner, repo, change.Path)
+
+	encodedContent := base64.StdEncoding.EncodeToString([]byte(change.Content))
+
+	reqBody := FileContentRequest{
+		Message: change.Message,
+		Content: encodedContent,
+		Branch:  branch,
+	}
+
+	if !change.NewFile {
+		sha, err := getFileSHA(url, token)
+		if err != nil {
+			return err
+		}
+		reqBody.Sha = sha
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send PUT request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Check if the file was created or updated successfully
+	if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusOK {
+		fmt.Println("File created/updated successfully!")
+		return nil
+	}
+
+	// If the request failed, read the error response
+	body_resp, _ := io.ReadAll(resp.Body)
+	return fmt.Errorf("failed to create/update file: %s, %s", resp.Status, string(body_resp))
+
+}
+
+func PRBranch(owner string, repo string, branch string, token string) error {
+	repository, err := GetRepo(owner, repo, token)
+	if err != nil {
+		return fmt.Errorf("failed to get repository")
+	}
+
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls", owner, repo)
+
+	reqBody := map[string]interface{}{
+		"title": "Auto-locking dependencies",
+		"head":  branch,
+		"base":  repository.DefaultBranch,
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send POST request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Check if the PR was created successfully
+	if resp.StatusCode == http.StatusCreated {
+		fmt.Println("PR created successfully!")
+		return nil
+	}
+
+	// If the request failed, read the error response
+	body_resp, _ := io.ReadAll(resp.Body)
+	return fmt.Errorf("failed to create PR: %s, %s", resp.Status, string(body_resp))
+}
+
+func CreatePR(owner string, repo string, changes []FileChange, token string) error {
+	// step 1 make a new branch
+	newBranch, err := GeneratePRBranch(owner, repo, token)
+	if err != nil {
+		return err
+	}
+
+	// step 2 create a new commit
+	for _, change := range changes {
+		err := CreateCommit(owner, repo, newBranch, change, token)
+		if err != nil {
+			return err
+		}
+	}
+
+	// step 3 create a new PR
+	err = PRBranch(owner, repo, newBranch, token)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
