@@ -1,5 +1,6 @@
 <script>
-    let hasAccess = true; 
+    export let data;
+
     
     function logout() {
         window.location.href = '/api/auth/logout';
@@ -27,13 +28,27 @@
     </nav>
   
     <!-- Content Section -->
-    <main class="flex-grow flex items-center justify-center">
-      {#if hasAccess}
-        <!-- Content when the user has access -->
+    <main class="flex-grow flex flex-col items-center justify-center p-8">
+      {#if data.error}
+        <!-- Show error message if there's an error -->
         <div class="text-center">
-          <h1 class="text-4xl font-bold text-green-600">Welcome to AutoLock!</h1>
-          <p class="text-lg text-gray-600 mt-4">You now have full access to the system.</p>
+          <h1 class="text-3xl font-bold text-red-600">Error</h1>
+          <p class="text-lg text-gray-600 mt-4">{data.error}</p>
         </div>
+      {:else if data.hasAccess}
+      <h1 class="text-3xl font-bold text-green-600 mb-6">Welcome, {data.user}!</h1>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {#each data.repos as repo}
+          <div class="bg-white shadow-md rounded-lg p-6">
+            <h2 class="text-xl font-bold text-gray-900">{repo.name}</h2>
+            <p class="text-sm text-gray-500">{repo.full_name}</p>
+            <p class="text-sm text-gray-700 mt-2">{repo.description ? repo.description : 'No description provided.'}</p>
+            <p class="text-sm text-gray-600 mt-2">Language: {repo.language}</p>
+            <p class="text-sm text-gray-600 mt-2">Owner: {repo.owner.login}</p>
+          </div>
+        {/each}
+      </div>
       {:else}
         <!-- Content when the user is on the waitlist -->
         <div class="text-center">

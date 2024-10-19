@@ -84,6 +84,7 @@ func GetScanStatusHandler(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "Repository not found",
 		})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -92,7 +93,42 @@ func GetScanStatusHandler(c *gin.Context) {
 }
 
 func GetScanResultsHandler(c *gin.Context) {
+	var req ScanRequest
+
+	// Bind the JSON body to the struct
+	if err := c.BindJSON(&req); err != nil {
+		// If there is an error, return a 400 Bad Request response
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid input",
+		})
+		return
+	}
+
+	var repo models.Repo
+	result := db.DB.Where("owner = ? AND name = ?", req.Owner, req.Repo).First(&repo)
+
+	if result.Error == gorm.ErrRecordNotFound {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Repository not found",
+		})
+		return
+	}
+
+	var languages []models.Language
+
+	error := db.DB.
+		Joins("JOIN repo_languages ON languages.id = repo_languages.language_id").
+		Where("repo_languages.repository_id = ? AND languages.supported = ?", repo.ID, true).
+		Find(&languages).Error
+
+	if error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to fetch scan results",
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"status": "Scan complete",
+		"languages": languages,
 	})
 }
