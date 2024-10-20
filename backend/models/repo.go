@@ -1,10 +1,12 @@
 package models
 
 type Repo struct {
-	ID           uint   `gorm:"primaryKey"`
-	Owner        string `gorm:"size:255;not null;uniqueIndex:idx_owner_name"`
-	Name         string `gorm:"size:255;not null;uniqueIndex:idx_owner_name"`
-	ScanComplete bool   `gorm:"default:false"`
+	ID              uint   `gorm:"primaryKey"`
+	Owner           string `gorm:"size:255;not null;uniqueIndex:idx_owner_name"`
+	Name            string `gorm:"size:255;not null;uniqueIndex:idx_owner_name"`
+	ScanComplete    bool   `gorm:"default:false"`
+	InstallStarted  bool   `gorm:"default:false"`
+	InstallComplete bool   `gorm:"default:false"`
 }
 
 type RepoLanguage struct {
