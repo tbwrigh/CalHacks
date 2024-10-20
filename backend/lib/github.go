@@ -758,3 +758,40 @@ func GetOrUpdateSecurityIssues(owner, repo, token string) error {
 
 	return nil
 }
+
+func GetCode(owner, repo, path, token string) (string, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/contents/%s", owner, repo, path)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	// Add the access token to the request headers
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to fetch code: %s", resp.Status)
+	}
+
+	var fileData map[string]interface{}
+	body, _ := io.ReadAll(resp.Body)
+	err = json.Unmarshal(body, &fileData)
+	if err != nil {
+		return "", err
+	}
+
+	content, err := base64.StdEncoding.DecodeString(fileData["content"].(string))
+	if err != nil {
+		return "", err
+	}
+
+	return string(content), nil
+}

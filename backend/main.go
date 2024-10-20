@@ -36,6 +36,7 @@ func main() {
 	router.POST("/install/callback", handlers.GetInstallCallbackHandler)
 	router.POST("/install/status", handlers.GetInstallStatusHandler)
 	router.POST("/issues/list", handlers.ListIssues)
+	router.POST("/issues/resolve", handlers.GetFixIssueHandler)
 
 	router.Run(":8080")
 }
