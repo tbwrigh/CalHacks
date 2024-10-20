@@ -5,6 +5,7 @@ import (
 	"calhacks/api/lib"
 	"calhacks/api/models"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -108,11 +109,13 @@ func GetFixIssueHandler(c *gin.Context) {
 			return
 		}
 
-		newCode, err := lib.FixSecurity(issue.StartLine, issue.EndLine, issue.FullDescription, code)
+		newCode, err := lib.GPTFixSecurity(issue.StartLine, issue.EndLine, issue.FullDescription, code)
 
 		if err != nil {
 			return
 		}
+
+		newCode = strings.Join(strings.Split(newCode, "\n")[1:len(strings.Split(newCode, "\n"))-1], "\n")
 
 		fileChange := lib.FileChange{
 			Path:    issue.Path,
