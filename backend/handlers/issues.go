@@ -54,5 +54,9 @@ func ListIssues(c *gin.Context) {
 		return
 	}
 
+	for i := range issues {
+		issues[i].Repository = repository
+	}
+
 	c.JSON(http.StatusOK, issues)
 }

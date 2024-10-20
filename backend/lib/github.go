@@ -642,6 +642,21 @@ func MakeAction(owner, repo, token string) error {
 	return nil
 }
 
+type SecIssue struct {
+	Number int `json:"number"`
+	Rule   struct {
+		FullDescription string `json:"full_description"`
+	} `json:"rule"`
+	MostRecentInstance struct {
+		Location struct {
+			Path      string `json:"path"`
+			StartLine int    `json:"start_line"`
+			EndLine   int    `json:"end_line"`
+		} `json:"location"`
+		Classifications []string `json:"classifications"`
+	} `json:"most_recent_instance"`
+}
+
 func GetSecurityIssues(owner, repo, token string) error {
 
 	var repository models.Repo
@@ -684,8 +699,7 @@ func GetSecurityIssues(owner, repo, token string) error {
 
 	fmt.Println("Got response")
 
-	// Parse the response body
-	var issues []models.SecurityIssue
+	var issues []SecIssue
 	if err := json.NewDecoder(resp.Body).Decode(&issues); err != nil {
 		return err
 	}
@@ -696,12 +710,20 @@ func GetSecurityIssues(owner, repo, token string) error {
 	for _, issue := range issues {
 		// Check if the issue already exists
 		var existingIssue models.SecurityIssue
-		result := db.DB.Where("repository_id = ? AND github_number = ?", repository.ID, issue.GithubNumber).
+		result := db.DB.Where("repository_id = ? AND github_number = ?", repository.ID, issue.Number).
 			First(&existingIssue)
 
 		if result.Error == gorm.ErrRecordNotFound {
-			issue.RepositoryID = repository.ID
-			db.DB.Create(&issue)
+			// Insert the issue into the database
+			securityIssue := models.SecurityIssue{
+				RepositoryID:    repository.ID,
+				Path:            issue.MostRecentInstance.Location.Path,
+				StartLine:       issue.MostRecentInstance.Location.StartLine,
+				EndLine:         issue.MostRecentInstance.Location.EndLine,
+				GithubNumber:    issue.Number,
+				FullDescription: issue.Rule.FullDescription,
+			}
+			db.DB.Create(&securityIssue)
 		}
 	}
 

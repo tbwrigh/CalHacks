@@ -8,6 +8,6 @@ type SecurityIssue struct {
 	EndLine         int    `gorm:"not null"`
 	GithubNumber    int    `gorm:"not null"`
 	FullDescription string `gorm:"not null"`
-	FixSuggested    bool   `gorm:"not null"default:false"`
+	FixSuggested    bool   `gorm:"not nulldefault:false"`
 	Repository      Repo   `gorm:"foreignKey:RepositoryID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }

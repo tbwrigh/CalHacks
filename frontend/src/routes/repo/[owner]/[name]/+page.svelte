@@ -1,16 +1,26 @@
 <script>
+  import SecurityIssuesList from "../../../../components/SecurityIssuesList.svelte";
+
     export let data;
 
     const baseUrl = import.meta.env.VITE_CLIENT_API_URL;
 
     let installPressed = false;
 
+    const getToken = () => {
+        try {          
+          const cookie = document.cookie.split('; ').find(row => row.startsWith('at='));
+          return cookie ? cookie.split('=')[1] : "";
+        }catch(e){
+          return "";
+        }
+    };
+
     const handleInstall = () => {
         installPressed = true;
 
         // get auth token from cookies (at)
-        const cookie = document.cookie.split('; ').find(row => row.startsWith('at='));
-        const token = cookie ? cookie.split('=')[1] : "";
+        const token = getToken();
 
       // post to the server to install the repository
       fetch(`${baseUrl}/install`, {
@@ -113,6 +123,8 @@
         {:else}
           <div class="text-center">
             <h2 class="text-3xl font-bold text-green-600 mb-4">Security For {data.name}</h2>
+
+            <SecurityIssuesList owner={data.owner} repo={data.name} />
           </div>
         {/if}
       {:else}
