@@ -33,6 +33,9 @@ func main() {
 	router.POST("/scan/status", handlers.GetScanStatusHandler)
 	router.POST("/scan/results", handlers.GetScanResultsHandler)
 	router.POST("/install", handlers.GetInstallHandler)
+	router.POST("/install/callback", handlers.GetInstallCallbackHandler)
+	router.POST("/install/status", handlers.GetInstallStatusHandler)
+	router.POST("/issues/list", handlers.ListIssues)
 
 	router.Run(":8080")
 }

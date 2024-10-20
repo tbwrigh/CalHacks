@@ -641,3 +641,98 @@ func MakeAction(owner, repo, token string) error {
 
 	return nil
 }
+
+func GetSecurityIssues(owner, repo, token string) error {
+
+	var repository models.Repo
+	result := db.DB.Where("owner = ? AND name = ?", owner, repo).First(&repository)
+	if result.Error != nil {
+		return result.Error
+	}
+
+	fmt.Println("Got repository")
+
+	client := &http.Client{}
+
+	// Create the GitHub API request
+	req, err := http.NewRequest("GET", fmt.Sprintf("https://api.github.com/repos/%s/%s/code-scanning/alerts", owner, repo), nil)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Created request")
+
+	// Add the Authorization header with the Bearer token
+	req.Header.Add("Authorization", "Bearer "+token)
+
+	fmt.Println("Added headers")
+
+	// Perform the request
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Sent request")
+
+	defer resp.Body.Close()
+
+	// Check for a successful response
+	if resp.StatusCode != http.StatusOK {
+		return err
+	}
+
+	fmt.Println("Got response")
+
+	// Parse the response body
+	var issues []models.SecurityIssue
+	if err := json.NewDecoder(resp.Body).Decode(&issues); err != nil {
+		return err
+	}
+
+	fmt.Println("Decoded response")
+
+	// Insert the security issues into the database
+	for _, issue := range issues {
+		// Check if the issue already exists
+		var existingIssue models.SecurityIssue
+		result := db.DB.Where("repository_id = ? AND github_number = ?", repository.ID, issue.GithubNumber).
+			First(&existingIssue)
+
+		if result.Error == gorm.ErrRecordNotFound {
+			issue.RepositoryID = repository.ID
+			db.DB.Create(&issue)
+		}
+	}
+
+	fmt.Println("Inserted issues")
+
+	return nil
+}
+
+func GetOrUpdateSecurityIssues(owner, repo, token string) error {
+	// delete all current security issues
+	var repository models.Repo
+	result := db.DB.Where("owner = ? AND name = ?", owner, repo).First(&repository)
+	if result.Error != nil {
+		return result.Error
+	}
+
+	db.DB.Where("repository_id = ?", repository.ID).Delete(&models.SecurityIssue{})
+
+	fmt.Println("Deleted existing security issues")
+
+	err := GetSecurityIssues(owner, repo, token)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Got security issues")
+
+	// update the repo to have rescan security set to false
+	db.DB.Model(&repository).Update("rescan_security", false)
+
+	fmt.Println("Updated repository")
+
+	return nil
+}

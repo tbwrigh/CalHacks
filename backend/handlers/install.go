@@ -161,3 +161,63 @@ func GetInstallHandler(c *gin.Context) {
 		"status": "Installation started",
 	})
 }
+
+func GetInstallCallbackHandler(c *gin.Context) {
+	var req ScanRequest
+
+	// Bind the JSON body to the struct
+	if err := c.BindJSON(&req); err != nil {
+		// If there is an error, return a 400 Bad Request response
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid input",
+		})
+		return
+	}
+
+	var repo models.Repo
+	result := db.DB.Where("owner = ? AND name = ?", req.Owner, req.Repo).First(&repo)
+
+	if result.Error == gorm.ErrRecordNotFound {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Repository not found",
+		})
+		return
+	}
+
+	db.DB.Model(&repo).Update("install_complete", true)
+
+	// set repo to rescan
+	db.DB.Model(&repo).Update("rescan_security", true)
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": "Installation complete",
+	})
+}
+
+func GetInstallStatusHandler(c *gin.Context) {
+	var req ScanRequest
+
+	// Bind the JSON body to the struct
+	if err := c.BindJSON(&req); err != nil {
+		// If there is an error, return a 400 Bad Request response
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid input",
+		})
+		return
+	}
+
+	var repo models.Repo
+	result := db.DB.Where("owner = ? AND name = ?", req.Owner, req.Repo).First(&repo)
+
+	if result.Error == gorm.ErrRecordNotFound {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Repository not found",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"installStarted":  repo.InstallStarted,
+		"installComplete": repo.InstallComplete,
+	})
+}

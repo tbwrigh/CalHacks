@@ -7,6 +7,7 @@ type Repo struct {
 	ScanComplete    bool   `gorm:"default:false"`
 	InstallStarted  bool   `gorm:"default:false"`
 	InstallComplete bool   `gorm:"default:false"`
+	RescanSecurity  bool   `gorm:"default:false"`
 }
 
 type RepoLanguage struct {

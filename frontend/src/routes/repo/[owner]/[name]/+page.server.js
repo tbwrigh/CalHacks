@@ -44,7 +44,28 @@ function delay(ms) {
 
         const resultData = await resultResponse.json();
 
-        return { scanComplete: scanComplete, successMessage: successMessage, resultData: resultData, name: name, owner: owner };
+        const installResponse = await fetch(`${apiUrl}/install/status`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              owner: owner,
+              repo: name,
+            }),
+        });
+
+        const installData = await installResponse.json();
+
+        return { 
+          scanComplete: scanComplete, 
+          successMessage: successMessage, 
+          resultData: resultData, 
+          name: name, 
+          owner: owner,
+          installStarted: installData.installStarted,
+          installComplete: installData.installComplete,
+        };
       }
   
       // Step 2: If scan results don't exist, start a new scan
@@ -89,7 +110,15 @@ function delay(ms) {
       }
   
       // After scan completes, return success
-      return {  scanComplete: scanComplete, successMessage: successMessage, resultData: {}, name: name, owner: owner };
+      return {  
+        scanComplete: scanComplete, 
+        successMessage: successMessage, 
+        resultData: {}, 
+        name: name, 
+        owner: owner,
+        installStarted: false,
+        installComplete: false, 
+      };
   
     } catch (error) {
       console.error('Error during scan process:', error);
