@@ -55,7 +55,7 @@
               <strong>Login with GitHub:</strong> Easily authenticate and integrate with your repositories.
             </li>
             <li>
-              <strong>Use our CLI tool:</strong> Get started in seconds by using the AutoLock CLI to secure your codebase with just a few commands.
+              <strong>Simple Web UI:</strong> Get started in seconds by using the AutoLock Web UI to secure your codebase with just a few clicks.
             </li>
             <li>
               <strong>CodeQL:</strong> AutoLock leverages GitHub’s powerful CodeQL analysis to identify vulnerabilities in your code.
