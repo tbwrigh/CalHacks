@@ -1,4 +1,5 @@
 import sqlite3
+import hashlib
 
 # Connect to an SQLite database (in-memory for this example)
 conn = sqlite3.connect(':memory:')
@@ -32,10 +33,11 @@ def get_user_password(username):
 # Vulnerable input - assume an attacker can input anything
 user_input = input("Enter your username: ")
 
-# Fetch and print the password (this is where the vulnerability lies)
+# Fetch and hash the password before printing
 password = get_user_password(user_input)
 if password:
-    print(f"Password for {user_input}: {password}")
+    hashed_password = hashlib.sha256(password.encode()).hexdigest()
+    print(f"Password (hashed) for {user_input}: {hashed_password}")
 else:
     print("User not found.")
 
