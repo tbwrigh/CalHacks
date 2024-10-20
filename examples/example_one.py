@@ -20,8 +20,8 @@ conn.commit()
 
 def get_user_password(username):
     # This is vulnerable to SQL injection!
-    query = f"SELECT password FROM users WHERE username = '{username}'"
-    cursor.execute(query)
+    query = f"SELECT password FROM users WHERE username = ?"
+    cursor.execute(query, (username,))
     result = cursor.fetchone()
     
     if result:
@@ -32,10 +32,10 @@ def get_user_password(username):
 # Vulnerable input - assume an attacker can input anything
 user_input = input("Enter your username: ")
 
-# Fetch and print the password (this is where the vulnerability lies)
+# Fetch the password without printing it (securing the vulnerability)
 password = get_user_password(user_input)
 if password:
-    print(f"Password for {user_input}: {password}")
+    print(f"Password for {user_input}: [SECURE]")
 else:
     print("User not found.")
 
