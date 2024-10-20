@@ -568,6 +568,14 @@ func CreatePR(owner string, repo string, changes []FileChange, token string) err
 }
 
 func MakeAction(owner, repo, token string) error {
+	// update the repo to have install started
+	var repository models.Repo
+	dbr := db.DB.Where("owner = ? AND name = ?", owner, repo).First(&repository)
+	if dbr.Error != nil {
+		return dbr.Error
+	}
+	db.DB.Model(&repository).Update("install_started", true)
+
 	// create PR in go routine
 	go func() {
 		fmt.Println("Creating PR...")
@@ -629,14 +637,6 @@ func MakeAction(owner, repo, token string) error {
 		CreatePR(owner, repo, []FileChange{fileChange}, token)
 
 		fmt.Println("Created PR")
-
-		// update the repo to have install started
-		var repository models.Repo
-		result = db.DB.Where("owner = ? AND name = ?", owner, repo).First(&repository)
-		if result.Error != nil {
-			return
-		}
-		db.DB.Model(&repository).Update("install_started", true)
 	}()
 
 	return nil

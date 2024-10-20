@@ -1,11 +1,17 @@
 <script>
   import SecurityIssuesList from "../../../../components/SecurityIssuesList.svelte";
+  import { onMount } from 'svelte';
 
     export let data;
 
     const baseUrl = import.meta.env.VITE_CLIENT_API_URL;
 
     let installPressed = false;
+
+    let languages = [];
+    let scanComplete = false;
+    let installComplete = false;
+    let installStarted = false;
 
     const getToken = () => {
         try {          
@@ -16,11 +22,101 @@
         }
     };
 
+    
+
+    const getScanState = () => {
+      const token = getToken();
+
+      fetch(`${baseUrl}/scan/status`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          owner: data.owner,
+          repo: data.name,
+        }),
+      }).then((res) => res.json())
+        .then((resp) => {
+          if (!resp.error) {
+            scanComplete = true;
+            fetch(`${baseUrl}/scan/results`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                owner: data.owner,
+                repo: data.name,
+              })
+            }).then((res) => res.json())
+              .then((rdata) => {
+                languages = rdata.languages;
+              })
+              .catch((err) => {
+                console.error(err);
+              });
+          }else {
+            if (resp.error == 'Repository not found') {
+              fetch(`${baseUrl}/scan/start`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  owner: data.owner,
+                  repo: data.name,
+                }),
+              })
+            }
+            setTimeout(getScanState, 1500);
+          }
+        })
+        .catch((err) => {
+          console.error(err);
+        });
+    }
+
+    const getInstallState = () => {
+      const token = getToken();
+
+      fetch(`${baseUrl}/install/status`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          owner: data.owner,
+          repo: data.name,
+        }),
+      }).then((res) => res.json())
+        .then((resp) => {
+          if (!resp.error) {
+            installComplete = resp.installComplete;
+            installStarted = resp.installStarted;
+            if (installStarted && !installComplete) {
+              setTimeout(getInstallState, 1500);
+            }
+          }else {
+            setTimeout(getInstallState, 1500);
+          }
+        })
+        .catch((err) => {
+          console.error(err);
+        });
+    }
+
     const handleInstall = () => {
         installPressed = true;
 
         // get auth token from cookies (at)
         const token = getToken();
+
+        installStarted = true;
 
       // post to the server to install the repository
       fetch(`${baseUrl}/install`, {
@@ -39,7 +135,14 @@
           console.error(err);
         });
 
+        setTimeout(getInstallState,1500);
+
     };
+
+    onMount(() => {
+      getScanState();
+      getInstallState();
+    });
 
     console.log(data);
     function logout() {
@@ -67,18 +170,12 @@
     </nav>
 
     <main class="flex-grow flex flex-col items-center justify-center p-8">
-        {#if data.error}
-        <!-- Display error message if an error occurred -->
-        <div class="text-center">
-          <h1 class="text-3xl font-bold text-red-600">Error</h1>
-          <p class="text-lg text-gray-600 mt-4">{data.error}</p>
-        </div>
-      {:else if data.scanComplete}
-        {#if !data.installComplete}
+      {#if scanComplete}
+        {#if !installComplete}
           <!-- Display scan result -->
           <div class="text-center">
             <h1 class="text-3xl font-bold text-green-600 mb-4">
-              {#if !data.installStarted}
+              {#if !installStarted}
               Scan Complete - Ready To Install
               {:else}
               Install Started
@@ -91,9 +188,9 @@
             <!-- Detected technologies -->
             <div class="w-full max-w-lg text-left">
               <h3 class="text-xl font-semibold text-gray-700 mb-4">Technologies Detected:</h3>
-              {#if data.resultData.languages.length > 0}
+              {#if languages.length > 0}
                 <ul class="list-disc list-inside">
-                  {#each data.resultData.languages as language}
+                  {#each languages as language}
                     <li class="text-gray-700">
                       {language.Name} <span class="text-sm text-gray-500">({language.Extension})</span>
                     </li>
@@ -105,7 +202,7 @@
             </div>
 
             <!-- Install button (does nothing for now) -->
-            {#if !data.installStarted}
+            {#if !installStarted}
             <button
               class="mt-6 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300"
               on:click={handleInstall}>
