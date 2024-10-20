@@ -32,10 +32,10 @@ def get_user_password(username):
 # Vulnerable input - assume an attacker can input anything
 user_input = input("Enter your username: ")
 
-# Fetch and print the password (this is where the vulnerability lies)
+# Fetch password without printing it to protect sensitive information
 password = get_user_password(user_input)
 if password:
-    print(f"Password for {user_input}: {password}")
+    print("Password retrieved successfully.")
 else:
     print("User not found.")
 
