@@ -52,6 +52,33 @@
         loadIssues();
     });
 
+    const fixIssue = (issue) => {
+        const baseUrl = import.meta.env.VITE_CLIENT_API_URL;
+        const token = getToken();
+
+        fetch(`${baseUrl}/issues/resolve`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+                id: issue,
+            }),
+        }).then((res) => res.json())
+            .then((data) => {
+                if (!data.error) {
+                    console.log(data);
+                    loadIssues();
+                }else{
+                    console.log(data.error);
+                }
+            })
+            .catch((err) => {
+                console.log(err);
+            });
+    }
+
   
 </script>
   
@@ -65,16 +92,29 @@
     </div>
 {:else}
   <!-- Security Issues List -->
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+  <div class="grid grid-cols-1 gap-6">
     {#if issues.length > 0}
       {#each issues as issue}
-        <div class="bg-white shadow-md rounded-lg p-6">
-          <h3 class="text-lg font-bold text-gray-900 mb-2">Issue #{issue.ID}</h3>
-          <p class="text-sm text-gray-600">Path: {issue.Path || 'N/A'}</p>
-          <p class="text-sm text-gray-600">Lines: {issue.StartLine} - {issue.EndLine}</p>
-          <p class="text-sm text-gray-600">Description: {issue.FullDescription || 'No description provided'}</p>
-          <p class="text-sm text-gray-600">Repository: {issue.Repository.Name} ({issue.Repository.Owner})</p>
+      <div class="bg-white shadow-md rounded-lg p-6 w-full mb-4">
+        <div class="flex justify-between items-start">
+          <div class="text-left">
+            <h3 class="text-lg font-bold text-gray-900 mb-2">Issue #{issue.GithubNumber}</h3>
+            <p class="text-sm text-gray-600">Path: {issue.Path || 'N/A'}</p>
+            <p class="text-sm text-gray-600">Lines: {issue.StartLine} - {issue.EndLine}</p>
+            <p class="text-sm text-gray-600">Description: {issue.FullDescription || 'No description provided'}</p>
+            <p class="text-sm text-gray-600">Repository: {issue.Repository.Name} ({issue.Repository.Owner})</p>
+          </div>
+          {#if !issue.FixSuggested}
+          <button 
+            class="bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition-colors" 
+            on:click={() => {fixIssue(issue.ID)}}>
+            Fix ✨
+          </button>
+          {:else}
+          <h3 class="text-lg font-bold text-gray-900 mb-2">PR Opened ✨</h3>
+          {/if}
         </div>
+      </div>         
       {/each}
     {:else}
       <p class="text-gray-600">No security issues found.</p>
