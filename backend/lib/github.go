@@ -622,6 +622,9 @@ func MakeAction(owner, repo, token string) error {
 		fmt.Println("Got langs")
 
 		content = []byte(strings.ReplaceAll(string(content), "%LANGUAGES%", strings.Join(langs, ",")))
+		content = []byte(strings.ReplaceAll(string(content), "%REPO%", repo))
+		content = []byte(strings.ReplaceAll(string(content), "%OWNER%", owner))
+		content = []byte(strings.ReplaceAll(string(content), "%CALLBACK_URL%", os.Getenv("CALLBACK_URL")))
 
 		fmt.Println("Replaced content")
 
