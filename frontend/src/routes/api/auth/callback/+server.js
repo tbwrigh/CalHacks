@@ -15,7 +15,7 @@ export async function GET({ url, cookies }) {
       client_id: import.meta.env.VITE_GITHUB_CLIENT_ID,
       client_secret: import.meta.env.VITE_GITHUB_CLIENT_SECRET,
       code,
-      redirect_uri: 'http://localhost:5173/api/auth/callback',
+      redirect_uri: import.meta.env.VITE_CALLBACK_URL,
     }),
   });
 

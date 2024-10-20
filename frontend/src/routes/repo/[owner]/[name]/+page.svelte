@@ -1,7 +1,7 @@
 <script>
     export let data;
 
-    const baseUrl = import.meta.env.VITE_API_URL;
+    const baseUrl = import.meta.env.VITE_CLIENT_API_URL;
 
     let installPressed = false;
 

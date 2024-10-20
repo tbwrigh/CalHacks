@@ -3,6 +3,7 @@ package main
 import (
 	"calhacks/api/db"
 	"calhacks/api/handlers"
+	"os"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -16,7 +17,7 @@ func main() {
 	router := gin.Default()
 
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173"}, // Allow your frontend origin
+		AllowOrigins:     []string{os.Getenv("ALLOWED_ORIGIN")}, // Allow your frontend origin
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Authorization", "Content-Type"},
 		ExposeHeaders:    []string{"Content-Length"},
